@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Build
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Download artifact
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          # Optional, GitHub token, a Personal Access Token with `public_repo` scope if needed
+          # Required, if artifact is from a different repo
+          # Required, workflow file name or ID
+          workflow: variables.yaml
+          workflow_conclusion: success
+          name: github-env
+          # Optional, directory where to extract artifact. Defaults to the artifact name (see `name` input)
+          path: .github
+      - name: Variables
+        uses: c-py/action-dotenv-to-setenv@v2
+        with:
+          env-file: .github/.env
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Add local bin to path
+        run : echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Set python unbuffered for proper eb console logs
+        run: echo 'PYTHONUNBUFFERED=1' >> $GITHUB_ENV
+      - name: Deploy
+        run: echo 1

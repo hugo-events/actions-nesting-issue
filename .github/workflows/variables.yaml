@@ -1,0 +1,81 @@
+name: Variables
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  variables:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    # Map a step output to a job output
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Get repository name
+        uses: jungwinter/split@v1
+        id: split
+        with:
+          msg: ${{ github.repository }}
+          seperator: /
+      - name: Set branch name
+        id: BRANCH_NAME
+        run: echo ::set-output name=value::$(echo ${GITHUB_REF#refs/heads/})
+      - name: Set version
+        id: VERSION
+        run: echo ::set-output name=value::$(date +%Y.%m.%d-%H.%M.%S)
+      - name: Set application
+        id: APPLICATION
+        run: echo ::set-output name=value::${{ steps.split.outputs._1 }}
+      - name: Set docker repo name
+        id: DOCKER_REPO_NAME
+        run: echo ::set-output name=value::hugoevents/${{ steps.APPLICATION.outputs.value }}
+      - name: Set docker repo registry
+        id: DOCKER_REGISTRY
+        run: echo ::set-output name=value::803559252216.dkr.ecr.eu-west-1.amazonaws.com
+      - name: Set docker repo registry URL
+        id: DOCKER_REGISTRY_URL
+        run: echo ::set-output name=value::${{ steps.DOCKER_REGISTRY.outputs.value }}/hugoevents
+      - name: Set docker repo URL
+        id: DOCKER_REPO_URL
+        run: echo ::set-output name=value::${{ steps.DOCKER_REGISTRY.outputs.value }}/${{ steps.DOCKER_REPO_NAME.outputs.value }}
+      - name: Set app env staging
+        id: env1
+        if: ${{ steps.BRANCH_NAME.outputs.value == 'master' }}
+        run: echo ::set-output name=value::staging
+      - name: Set app env production
+        id: env2
+        if: ${{ steps.BRANCH_NAME.outputs.value == 'production' }}
+        run: echo ::set-output name=value::production
+      - name: Set app env
+        id: ENVIRONMENT
+        run: echo ::set-output name=value::${{ steps.env1.outputs.value }}${{ steps.env2.outputs.value }}
+      - name: Step docker image name
+        id: IMAGE
+        run: echo ::set-output name=value::${{ steps.DOCKER_REPO_NAME.outputs.value }}:${{ steps.VERSION.outputs.value }}
+      - name: Step docker image name
+        id: IMAGE_URL
+        run: echo ::set-output name=value::${{ steps.DOCKER_REPO_URL.outputs.value }}:${{ steps.VERSION.outputs.value }}
+      - name: render
+        run: |
+          echo 'BRANCH_NAME=${{ steps.BRANCH_NAME.outputs.value }}' >> .github/.env
+          echo 'VERSION=${{ steps.VERSION.outputs.value }}' >> .github/.env
+          echo 'APPLICATION=${{ steps.APPLICATION.outputs.value }}' >> .github/.env
+          echo 'DOCKER_REPO_NAME=${{ steps.DOCKER_REPO_NAME.outputs.value }}' >> .github/.env
+          echo 'DOCKER_REGISTRY=${{ steps.DOCKER_REGISTRY.outputs.value }}' >> .github/.env
+          echo 'DOCKER_REGISTRY_URL=${{ steps.DOCKER_REGISTRY_URL.outputs.value }}' >> .github/.env
+          echo 'DOCKER_REPO_URL=${{ steps.DOCKER_REPO_URL.outputs.value }}' >> .github/.env
+          echo 'ENVIRONMENT=${{ steps.ENVIRONMENT.outputs.value }}' >> .github/.env
+          echo 'IMAGE=${{ steps.IMAGE.outputs.value }}' >> .github/.env
+          echo 'IMAGE_URL=${{ steps.IMAGE_URL.outputs.value }}' >> .github/.env
+      - name: upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: github-env
+          path: |
+            .github/.env
